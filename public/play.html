@@ -1,0 +1,633 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Ctext y=%27.9em%27 font-size=%2790%27%3E%F0%9F%8E%AB%3C/text%3E%3C/svg%3E">
+<title>Tambola — Play</title>
+<link rel="stylesheet" href="theme.css">
+<link rel="stylesheet" href="ticket.css">
+<style>
+  html, body { height: 100%; overscroll-behavior: none; }
+  #app { min-height: 100%; padding: 14px; padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px)); padding-top: calc(14px + env(safe-area-inset-top, 0px)); }
+  section.screen { display: none; min-height: calc(100vh - 28px); } section.screen.on { display: flex; flex-direction: column; }
+  .center { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 14px; }
+  .wrap { max-width: 440px; margin: 0 auto; width: 100%; }
+
+  /* Join screen */
+  .brand { font-family: var(--serif); font-size: 2rem; font-weight: 800; color: var(--gold); text-align: center; margin-bottom: 6px; }
+  .tabs { display: flex; gap: 8px; margin: 14px 0; }
+  .tabs button { flex: 1; }
+  #scanWrap { position: relative; background: #000; border-radius: 12px; overflow: hidden; aspect-ratio: 1; max-height: min(30vh, 260px); margin: 0 auto; }
+  @media (max-height: 460px) {
+    #app { padding-top: calc(8px + env(safe-area-inset-top, 0px)); padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px)); }
+    .brand { font-size: 1.3rem; margin-bottom: 4px; }
+    .tabs { margin: 6px 0; }
+    #scanWrap { max-height: min(16vh, 120px); }
+    #scanMsg { font-size: .8rem; margin: 2px 0; }
+    #btnScanRetry { margin-top: 4px !important; }
+    label.field { margin-bottom: 4px; }
+    label.field[style] { margin-top: 6px !important; }
+    .pinboxes input { height: 36px; }
+    #btnJoin { min-height: 46px; font-size: 1.05rem; padding: .5rem 1rem; }
+  }
+  /* Landscape phones: use the spare width — scanner/inputs left, name + Join right — instead of
+     squeezing everything into one short column (which left only a tiny viewfinder). */
+  @media (max-height: 460px) and (orientation: landscape) {
+    #s-join .wrap { max-width: 800px; display: grid; grid-template-columns: 1fr 1fr; column-gap: 20px; align-content: start; }
+    #s-join .brand, #s-join .tabs { grid-column: 1 / -1; }
+    #paneScan, #paneRooms, #paneManual { grid-column: 1; grid-row: 3 / span 4; min-width: 0; }
+    #s-join .wrap > label.field { grid-column: 2; grid-row: 3; margin-top: 0 !important; }
+    #s-join .wrap > #btnJoin { grid-column: 2; grid-row: 4; align-self: start; }
+    #s-join .wrap > #joinErr { grid-column: 2; grid-row: 5; }
+    #scanWrap { max-height: min(46vh, 190px); }
+    .tabs { margin: 4px 0 8px; }
+  }
+  #scanVideo { width: 100%; height: 100%; object-fit: cover; }
+  #scanBox { position: absolute; inset: 12%; border: 3px solid var(--gold); border-radius: 10px; }
+  .rooms { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; max-height: 40vh; overflow: auto; }
+  .rooms li button { width: 100%; text-align: left; background: var(--navy-70); border: 1px solid var(--paper-12); border-radius: 10px; padding: 10px 12px; color: var(--paper); cursor: pointer; }
+  .manual { display: grid; gap: 10px; }
+  .pinboxes { display: flex; gap: 8px; justify-content: center; }
+  .pinboxes input { width: 48px; text-align: center; font-family: var(--serif); font-size: 1.5rem; padding: 0; }
+
+  /* Waiting lobby */
+  .wlist { list-style: none; padding: 0; margin: 14px 0; display: grid; gap: 6px; width: 100%; max-width: 340px; }
+  .wlist li { background: var(--navy-70); padding: 8px 12px; border-radius: 8px; }
+  .spinner { width: 46px; height: 46px; border-radius: 50%; border: 4px solid var(--paper-20); border-top-color: var(--gold); animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Landscape lock notice */
+  #s-rotate { position: fixed; inset: 0; background: var(--teal); z-index: 90; display: none; align-items: center; justify-content: center; text-align: center; padding: 24px; }
+  #s-rotate.on { display: flex; }
+  .rot-icon { font-size: 3.4rem; margin-bottom: 10px; animation: rock 1.6s ease-in-out infinite; }
+  @keyframes rock { 0%,100% { transform: rotate(0deg); } 50% { transform: rotate(-88deg); } }
+
+  /* In-game */
+  #s-game { padding: 8px; padding-top: calc(8px + env(safe-area-inset-top, 0px)); padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px)); }
+  #g-stack { flex: 1; display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+  #g-topbar { flex: 0 0 auto; display: flex; align-items: center; gap: 10px; padding: 8px 12px; margin-left: 64px; margin-right: 88px; }
+  #g-topbar .ball { --ball: clamp(44px, 9vw, 64px); }
+  #g-ticket { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+  #g-ticket .ticket-box { width: auto; margin: 0; }
+  #g-bottom { flex: 0 0 auto; display: flex; gap: 8px; max-height: 32vh; }
+  #g-bottom > .panel { flex: 1; min-width: 0; padding: 6px 8px; overflow-y: auto; display: flex; flex-direction: column; }
+  #g-bottom .claimgrid, #g-bottom .rowbtns { flex: 1; }
+  #g-bottom h3 { margin-bottom: 4px !important; font-size: .82rem; }
+  .claimgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+  .claimgrid button { min-height: 32px; padding: .25rem .3rem; font-size: .68rem; line-height: 1.15; }
+  .rowbtns { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+  .rowbtns button { min-height: 32px; font-size: .72rem; }
+  #quitBtn { position: fixed; top: calc(6px + env(safe-area-inset-top, 0px)); left: 6px; z-index: 40; background: var(--bad); border-color: var(--bad); color: #fff; min-height: 34px; padding: .3rem .7rem; font-size: .78rem; }
+  #connDot { position: fixed; bottom: calc(6px + env(safe-area-inset-bottom, 0px)); right: 8px; z-index: 40; }
+  #annRegion { position: fixed; top: calc(46px + env(safe-area-inset-top, 0px)); right: 6px; width: 280px; max-width: 46vw; z-index: 45; display: grid; gap: 6px; }
+  #annRegion .toast { font-size: .82rem; padding: 5px 9px; }
+  #reconOverlay { position: fixed; inset: 0; background: var(--ink-60); z-index: 55; display: none; align-items: center; justify-content: center; text-align: center; padding: 20px; }
+  #reconOverlay.on { display: flex; }
+  #fontRange { width: 100%; accent-color: var(--gold); }
+  #btnFullscreen, #btnSettings { position: fixed; top: calc(6px + env(safe-area-inset-top, 0px)); z-index: 96; min-height: 34px; min-width: 38px; padding: .3rem .6rem; font-size: 1rem; }
+  #btnFullscreen { right: 6px; }
+  #btnSettings { right: 50px; z-index: 40; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- Join Room (07 §9.2) -->
+  <section class="screen on" id="s-join">
+    <div class="wrap">
+      <div class="brand">Tambola</div>
+      <div class="tabs">
+        <button class="btn small" id="tabScan" aria-pressed="true">Scan QR</button>
+        <button class="btn ghost small" id="tabRooms" aria-pressed="false">Nearby</button>
+        <button class="btn ghost small" id="tabManual" aria-pressed="false">Enter manually</button>
+      </div>
+
+      <div id="paneScan">
+        <div id="scanWrap"><video id="scanVideo" playsinline muted></video><div id="scanBox"></div></div>
+        <p class="caption" id="scanMsg">Point your camera at the host's QR code.</p>
+        <button class="btn ghost" id="btnScanRetry" style="margin-top:8px" hidden>Try again</button>
+      </div>
+
+      <div id="paneRooms" class="hidden">
+        <p class="caption">Rooms found on this Wi-Fi (browsers can't auto-discover games, so tap refresh after the host opens the lobby).</p>
+        <button class="btn ghost small" id="btnRefreshRooms" style="margin:8px 0">Refresh</button>
+        <ul class="rooms" id="roomsList"></ul>
+        <p class="caption" id="roomsEmpty">No rooms found yet.</p>
+      </div>
+
+      <div id="paneManual" class="hidden manual">
+        <label class="field"><span class="lbl">Host address (IP:port)</span><input type="text" id="manualHost" inputmode="url" placeholder="192.168.1.23:8189" autocomplete="off"></label>
+        <label class="field"><span class="lbl">PIN</span>
+          <div class="pinboxes">
+            <input type="text" class="pd" maxlength="1" inputmode="numeric"><input type="text" class="pd" maxlength="1" inputmode="numeric"><input type="text" class="pd" maxlength="1" inputmode="numeric"><input type="text" class="pd" maxlength="1" inputmode="numeric">
+          </div>
+        </label>
+      </div>
+
+      <label class="field" style="margin-top:16px"><span class="lbl">Your name</span><input type="text" id="nameInput" maxlength="20" placeholder="1–20 characters" autocomplete="off"></label>
+      <button class="btn big" id="btnJoin" style="width:100%">Join room</button>
+      <p class="caption" id="joinErr" style="color:var(--bad)"></p>
+    </div>
+  </section>
+
+  <!-- Pending approval (07 §9.2 step 2) -->
+  <section class="screen" id="s-pending">
+    <div class="center"><div class="spinner"></div><h2 id="pendingTitle">Joining…</h2><p class="muted">This can take a moment. You can back out any time.</p>
+      <button class="btn ghost" id="btnPendingBack">Back</button></div>
+  </section>
+
+  <!-- Waiting Lobby (07 §9.2 step 3) -->
+  <section class="screen" id="s-wait">
+    <div class="center">
+      <h2>Waiting for host to start…</h2>
+      <p class="muted" id="waitYou"></p>
+      <ul class="wlist" id="waitList"></ul>
+      <button class="btn ghost" id="btnLeaveWait">Leave</button>
+    </div>
+  </section>
+
+  <!-- In-game (07 §9.3) -->
+  <section class="screen" id="s-game">
+    <button class="btn" id="quitBtn">Quit</button>
+    <span class="dot" id="connDot"></span>
+    <div id="annRegion" aria-live="polite"></div>
+    <div id="g-stack">
+      <div class="panel" id="g-topbar"><div class="ball" id="curBall"><span id="curNum">–</span></div><div><div class="small muted">Current number</div><div class="small" id="callCount"></div></div></div>
+      <div id="g-ticket"><div id="ticketHost"></div></div>
+      <div id="g-bottom">
+        <div class="panel"><h3 class="small" style="margin-bottom:6px">Claim a prize</h3><div class="claimgrid" id="claimBtns"></div></div>
+        <div class="panel"><h3 class="small" style="margin-bottom:6px">Row completed</h3><div class="rowbtns" id="rowBtns">
+          <button class="btn ghost" data-row="top">Top</button><button class="btn ghost" data-row="middle">Middle</button><button class="btn ghost" data-row="bottom">Bottom</button>
+        </div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Game Over -->
+  <section class="screen" id="s-over">
+    <div class="center wrap">
+      <h1 style="font-family:var(--serif);color:var(--gold)">Game over</h1>
+      <table class="lb" style="width:100%;max-width:360px" id="overTable"><tbody></tbody></table>
+      <button class="btn" id="btnBackJoin">Back to join screen</button>
+    </div>
+  </section>
+</div>
+
+<div id="s-rotate"><div><div class="rot-icon">📱</div><h2>Turn your phone sideways</h2><p class="muted">Tambola tickets are easier to read in landscape.</p></div></div>
+<div id="reconOverlay"><div><h2>Host disconnected</h2><p class="muted">Waiting for the host to come back… your ticket and marks are safe.</p><div class="spinner" style="margin:14px auto"></div></div></div>
+
+<!-- Fullscreen toggle (always available) -->
+<button class="btn ghost" id="btnFullscreen" aria-label="Toggle fullscreen">⛶</button>
+
+<!-- Settings sheet trigger (accessibility: font size, ambient audio — 09 §5, §7) -->
+<button class="btn ghost" id="btnSettings" aria-label="Player settings">⚙</button>
+
+<script src="engine.js"></script>
+<script src="fx.js"></script>
+<script src="ticket.js"></script>
+<script>
+(function () {
+  'use strict';
+  var T = Tambola, esc = Fx.esc;
+  var $ = function (s) { return document.querySelector(s); };
+  var KEY = { name: 'tambola.player.name', session: 'tambola.player.session', font: 'tambola.player.font', ambient: 'tambola.player.ambient' };
+  function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  function lsDel(k) { try { localStorage.removeItem(k); } catch (e) {} }
+
+  var curScreen = 'join';
+  function go(name) {
+    curScreen = name;
+    ['join', 'pending', 'wait', 'game', 'over'].forEach(function (n) { $('#s-' + n).classList.toggle('on', n === name); });
+    applyOrientationGate(); window.scrollTo(0, 0);
+  }
+
+  // ---------- landscape lock (07 §9.1): true lock isn't available to web pages, so this is the
+  // closest honest equivalent — the Screen Orientation API where supported, plus a full-screen
+  // rotate prompt that blocks play in portrait, exactly like the spec's intent. ----------
+  function tryLockLandscape() {
+    try {
+      var so = window.screen && window.screen.orientation;
+      if (so && so.lock) so.lock('landscape').catch(function () {});
+    } catch (e) {}
+  }
+  function isPortrait() { return window.matchMedia('(orientation: portrait)').matches; }
+  function applyOrientationGate() {
+    var need = curScreen === 'game';                       // only the in-game screen is landscape-only (07 §9.1)
+    $('#s-rotate').classList.toggle('on', need && isPortrait());
+  }
+  window.addEventListener('resize', applyOrientationGate);
+  window.addEventListener('orientationchange', applyOrientationGate);
+
+  // ---------- back-gesture lock during in_progress (07 §9.4) ----------
+  var backLocked = false;
+  function lockBack() {
+    if (backLocked) return; backLocked = true;
+    history.pushState({ tambolaGuard: true }, '');
+    window.addEventListener('popstate', onPop);
+  }
+  function unlockBack() {
+    if (!backLocked) return; backLocked = false;
+    window.removeEventListener('popstate', onPop);
+  }
+  function onPop() { if (backLocked) history.pushState({ tambolaGuard: true }, ''); }  // no-op, no dialog of its own
+  window.addEventListener('beforeunload', function (e) {
+    if (net.gameStatus === 'in_progress') { e.preventDefault(); e.returnValue = ''; }
+  });
+
+  // ---------- connection ----------
+  var ws = null, connOpen = false, retry = 0, retryTimer = null, manualClose = false;
+  var identity = null;              // { playerId, sessionToken, host, port, pin }
+  var net = { gameStatus: 'lobby', calledNumbersSoFar: [], claimedPrizes: [], ticket: null, rankings: [] };
+  var marks = {};                    // number -> true (local display only, never transmitted)
+  var rowUsed = { top: false, middle: false, bottom: false };
+  var hostGoneTimer = null, HOST_GRACE_MS = 10000;
+  var toasts = new Fx.ToastQueue($('#annRegion'), 2, 2500);
+  var prizesResolved = {};
+
+  function wsUrl(hostAddr) { return (location.protocol === 'https:' ? 'wss://' : 'ws://') + hostAddr + '/join'; }
+  function connect(hostAddr) {
+    manualClose = false;
+    try { ws = new WebSocket(wsUrl(hostAddr)); } catch (e) { return scheduleRetry(hostAddr); }
+    ws.onopen = function () { connOpen = true; retry = 0; updateConnDot(); onSocketOpen(); };
+    ws.onclose = function () { connOpen = false; updateConnDot(); if (!manualClose) { onSocketLost(); scheduleRetry(hostAddr); } };
+    ws.onerror = function () {};
+    ws.onmessage = function (e) { var m; try { m = JSON.parse(e.data); } catch (_) { return; } onMessage(m); };
+  }
+  function scheduleRetry(hostAddr) {
+    clearTimeout(retryTimer); retry = Math.min(retry + 1, 6);
+    retryTimer = setTimeout(function () { connect(hostAddr); }, 500 * Math.pow(1.6, retry));
+  }
+  function send(type, payload) {
+    if (!ws || ws.readyState !== 1) return;
+    var env = { type: type, payload: payload || {}, timestamp: Date.now() };
+    if (identity && identity.sessionToken && type !== 'JOIN_ROOM' && type !== 'JOIN_REQUEST') env.sessionToken = identity.sessionToken;
+    ws.send(JSON.stringify(env));
+  }
+  function updateConnDot() {
+    var d = $('#connDot'); if (!d) return;
+    d.className = 'dot ' + (connOpen ? 'connected' : 'disconnected');
+  }
+
+  function onSocketOpen() {
+    if (pendingJoin) return doJoin(pendingJoin.name, pendingJoin.pin);
+    if (identity && identity.playerId && curScreen !== 'join') send('STATE_SYNC_REQUEST', { playerId: identity.playerId, sessionToken: identity.sessionToken });
+  }
+  function onSocketLost() {
+    if (curScreen === 'game') { Haptic.single(); clearTimeout(hostGoneTimer); hostGoneTimer = setTimeout(function () { $('#reconOverlay').classList.add('on'); }, HOST_GRACE_MS); }
+  }
+
+  // ---------- inbound messages ----------
+  function onMessage(m) {
+    switch (m.type) {
+      case 'JOIN_APPROVED': return onJoinApproved(m.payload);
+      case 'JOIN_REJECTED': return onJoinRejected(m.payload);
+      case 'ROOM_SETTINGS': return onRoomSettings(m.payload);
+      case 'ASSIGN_TICKET': return onAssignTicket(m.payload);
+      case 'NUMBER_CALLED': return onNumberCalled(m.payload);
+      case 'CLAIM_RESULT': return onClaimResult(m.payload);
+      case 'ANNOUNCE': return onAnnounce(m.payload);
+      case 'LEADERBOARD_UPDATE': return onLeaderboard(m.payload);
+      case 'GAME_PAUSE': net.gameStatus = 'paused'; renderCallPanel(); return;
+      case 'GAME_RESUME': net.gameStatus = 'in_progress'; renderCallPanel(); return;
+      case 'GAME_OVER': return onGameOver(m.payload);
+      case 'KICK_PLAYER': return onKicked(m.payload);
+      case 'STATE_SYNC_RESPONSE': return onSync(m.payload);
+      case 'CLAIM_OVERRIDE': return onOverride(m.payload);
+    }
+  }
+
+  var pendingJoin = null;
+  function onJoinApproved(p) {
+    identity = { playerId: p.playerId, sessionToken: p.sessionToken, host: identity.host, port: identity.port, pin: identity.pin, name: pendingJoin ? pendingJoin.name : identity.name };
+    lsSet(KEY.session, JSON.stringify(identity));
+    lsSet(KEY.name, identity.name);
+    pendingJoin = null; go('wait');
+  }
+  function onJoinRejected(p) {
+    if (curScreen === 'pending') { go('join'); $('#joinErr').textContent = p.reason || 'Host declined'; return; }
+    $('#joinErr').textContent = p.reason || 'Could not join'; setBusy(false);
+    identity = null; pendingJoin = null;
+  }
+  var waitPlayers = [];
+  function onRoomSettings(p) { net.settings = p; renderClaimButtons(); }
+  function onAssignTicket(p) { net.ticket = p.ticket; }
+  function onNumberCalled(p) {
+    net.calledNumbersSoFar = p.calledNumbersSoFar; net.lastNumber = p.number; net.callIndex = p.callIndex;
+    net.gameStatus = 'in_progress';
+    if (curScreen !== 'game') { buildTicket(); lockBack(); tryLockLandscape(); go('game'); fitTicketBox(); }
+    Haptic.light();
+    renderCurrent(); renderClaimButtons();
+  }
+  function onClaimResult(p) {
+    var mine = identity && p.playerId === identity.playerId;
+    if (p.accepted) {
+      prizesResolved[p.prizeType] = p.playerId;
+      if (mine) { Haptic.heavy(); if (p.prizeType === 'fullHouse') { Sfx.fanfare(); Fx.confetti(); } else Sfx.chime(); toasts.push(p.playerName + ' won ' + T.PRIZES[p.prizeType].label + '!', 'win'); }
+      else toasts.push(p.playerName + ' won ' + T.PRIZES[p.prizeType].label, 'win');
+      renderClaimButtons();
+    } else if (mine) { Fx.modal('<h3>' + esc(T.PRIZES[p.prizeType].label) + ' not accepted</h3><p class="muted">' + esc(p.rejectionReason || '') + '</p>'); }
+  }
+  function onAnnounce(p) { toasts.push(p.playerName + ' — ' + ({ top: 'Top', middle: 'Middle', bottom: 'Bottom' })[p.row] + ' Line Completed'); Sfx.popup(); }
+  function onLeaderboard(p) { net.rankings = p.rankings; if (curScreen === 'wait') renderWaitList(); }
+  function onGameOver(p) { net.gameStatus = 'ended'; net.finalRankings = p.finalRankings; unlockBack(); go('over'); renderOver(); }
+  function onKicked() {
+    manualClose = true; try { ws.close(); } catch (e) {}
+    identity = null; lsDel(KEY.session); unlockBack();
+    Fx.modal('<h3>Removed from the room</h3><p class="muted">The host removed you from this game.</p>').then(function () { go('join'); });
+  }
+  function onSync(p) {
+    net.ticket = p.ticket; net.calledNumbersSoFar = p.calledNumbersSoFar; net.claimedPrizes = p.claimedPrizes; net.gameStatus = p.gameStatus;
+    p.claimedPrizes.forEach(function (k) { prizesResolved[k] = prizesResolved[k] || '?'; });
+    clearTimeout(hostGoneTimer); $('#reconOverlay').classList.remove('on');
+    if (p.gameStatus === 'lobby') go('wait');
+    else if (p.gameStatus === 'ended') { go('over'); }
+    else { if (curScreen !== 'game') { buildTicket(); lockBack(); tryLockLandscape(); } go('game'); fitTicketBox(); renderAll(); }
+  }
+  function onOverride(p) {
+    if (p.newAcceptedState) prizesResolved[p.prizeType] = p.playerId; else delete prizesResolved[p.prizeType];
+    renderClaimButtons(); toasts.push('A claim was corrected by the host');
+  }
+
+  // ---------- join screen ----------
+  var joinMode = 'scan';
+  function setTab(mode) {
+    joinMode = mode;
+    ['scan', 'rooms', 'manual'].forEach(function (m) {
+      $('#pane' + cap(m)).classList.toggle('hidden', m !== mode);
+      $('#tab' + cap(m)).setAttribute('aria-pressed', String(m === mode));
+      $('#tab' + cap(m)).classList.toggle('ghost', m !== mode);
+    });
+    if (mode === 'scan') startScanner(); else stopScanner();
+  }
+  function cap(s) { return s[0].toUpperCase() + s.slice(1); }
+  $('#tabScan').onclick = function () { setTab('scan'); };
+  $('#tabRooms').onclick = function () { setTab('rooms'); refreshRooms(); };
+  $('#tabManual').onclick = function () { setTab('manual'); };
+
+  // QR scanning via native BarcodeDetector where available; graceful message otherwise (no extra libraries needed offline).
+  var scanStream = null, scanRAF = 0, detector = null;
+  function startScanner() {
+    stopScanner();
+    if (!('mediaDevices' in navigator) || !navigator.mediaDevices.getUserMedia) { scanMsg('Camera scanning isn\'t available in this browser. Use "Enter manually" instead.', true); return; }
+    if (!('BarcodeDetector' in window)) { scanMsg('This browser can\'t scan QR codes automatically. Use "Enter manually", or open your phone\'s camera app and point it at the code.', true); }
+    else { try { detector = new BarcodeDetector({ formats: ['qr_code'] }); } catch (e) { detector = null; } }
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } }).then(function (stream) {
+      scanStream = stream; var v = $('#scanVideo'); v.srcObject = stream; v.play().catch(function () {});
+      if (detector) loopScan();
+    }).catch(function () { scanMsg('Camera access was blocked. Allow the camera, or use "Enter manually".', true); });
+  }
+  function stopScanner() { cancelAnimationFrame(scanRAF); if (scanStream) { scanStream.getTracks().forEach(function (t) { t.stop(); }); scanStream = null; } }
+  function scanMsg(text, showRetry) { $('#scanMsg').textContent = text; $('#btnScanRetry').hidden = !showRetry; }
+  $('#btnScanRetry').onclick = function () { scanMsg('Point your camera at the host\'s QR code.', false); startScanner(); };
+  function loopScan() {
+    if (!detector || !scanStream) return;
+    detector.detect($('#scanVideo')).then(function (codes) {
+      if (codes && codes[0]) { stopScanner(); handleScanned(codes[0].rawValue); } else scanRAF = requestAnimationFrame(loopScan);
+    }).catch(function () { scanRAF = requestAnimationFrame(loopScan); });
+  }
+  function handleScanned(text) {
+    try {
+      var u = new URL(text, location.href);
+      var host = u.searchParams.get('pin') !== null ? u.host : null;
+      if (u.protocol === 'ws:' || u.protocol === 'wss:') host = u.host;
+      var pin = u.searchParams.get('pin');
+      if (!host || !pin) throw new Error('bad');
+      setJoinTarget(host, pin); scanMsg('Code recognised — enter your name below and tap Join.', false);
+      $('#nameInput').focus();
+    } catch (e) { scanMsg('That code doesn\'t look like a Tambola invite. Try again.', true); }
+  }
+
+  // fetch() with a timeout, using plain AbortController (supported since ~2017) rather than
+  // AbortSignal.timeout() (only ~2022+), since budget/older Android WebViews are common among
+  // this app's likely users and a missing API here would otherwise throw synchronously per probe.
+  function fetchTimeout(url, ms) {
+    try {
+      if (typeof AbortController === 'undefined') return fetch(url, { cache: 'no-store' });
+      var ctrl = new AbortController();
+      var t = setTimeout(function () { ctrl.abort(); }, ms);
+      return fetch(url, { cache: 'no-store', signal: ctrl.signal }).finally(function () { clearTimeout(t); });
+    } catch (e) { return Promise.reject(e); }
+  }
+  // Nearby rooms: browsers cannot do mDNS discovery, so this offers same-subnet probing as a courtesy.
+  function refreshRooms() {
+    $('#roomsList').innerHTML = ''; $('#roomsEmpty').textContent = 'Searching…'; $('#roomsEmpty').classList.remove('hidden');
+    var mine = location.hostname.split('.'); if (mine.length !== 4) { $('#roomsEmpty').textContent = 'Not on a local network — use Scan QR or Enter manually.'; return; }
+    var base = mine.slice(0, 3).join('.'), found = [], pending = 0, done = false;
+    var finish = function () { if (done) return; done = true; $('#roomsEmpty').classList.toggle('hidden', found.length > 0); if (!found.length) $('#roomsEmpty').textContent = 'No rooms found. Ask the host for the QR code or PIN instead.'; };
+    for (var i = 1; i <= 254; i++) {
+      (function (ip) {
+        pending++;
+        fetchTimeout('http://' + ip + ':' + (location.port || 8189) + '/info', 900)
+          .then(function (r) { return r.json(); }).then(function (j) {
+            if (j && j.hostPresent) { found.push(ip); var li = document.createElement('li'); var b = document.createElement('button'); b.textContent = 'Room on ' + ip; b.onclick = function () { setJoinTarget(ip + ':' + (location.port || 8189), null); setTab('manual'); $('#manualHost').value = ip + ':' + (location.port || 8189); }; li.appendChild(b); $('#roomsList').appendChild(li); }
+          }).catch(function () {}).finally(function () { if (--pending === 0) finish(); });
+      })(base + '.' + i);
+    }
+    setTimeout(finish, 4000);
+  }
+  $('#btnRefreshRooms').onclick = refreshRooms;
+
+  function setJoinTarget(hostAddr, pin) { $('#manualHost').value = hostAddr; if (pin) { var d = $('#paneManual').querySelectorAll('.pd'); pin.split('').forEach(function (c, i) { if (d[i]) d[i].value = c; }); } }
+  var pinDigits = $('#paneManual').querySelectorAll('.pd');
+  Array.prototype.forEach.call(pinDigits, function (el, i) {
+    el.addEventListener('input', function () { this.value = this.value.replace(/\D/g, '').slice(0, 1); if (this.value && pinDigits[i + 1]) pinDigits[i + 1].focus(); });
+    el.addEventListener('keydown', function (e) { if (e.key === 'Backspace' && !this.value && pinDigits[i - 1]) pinDigits[i - 1].focus(); });
+  });
+  function manualPin() { return Array.prototype.map.call(pinDigits, function (d) { return d.value || ''; }).join(''); }
+
+  var nameEl = $('#nameInput'); nameEl.value = lsGet(KEY.name) || '';
+  function setBusy(b) { $('#btnJoin').disabled = b; $('#btnJoin').textContent = b ? 'Joining…' : 'Join room'; }
+
+  $('#btnJoin').onclick = function () {
+    $('#joinErr').textContent = '';
+    var name = nameEl.value.trim();
+    if (!name || name.length > 20) { $('#joinErr').textContent = 'Enter a name (1–20 characters).'; return; }
+    var hostAddr, pin;
+    if (joinMode === 'manual') {
+      hostAddr = $('#manualHost').value.trim().replace(/^https?:\/\//, '').replace(/\/$/, ''); pin = manualPin();
+      if (!hostAddr) { $('#joinErr').textContent = 'Enter the host\'s address.'; return; }
+      if (pin.length !== 4) { $('#joinErr').textContent = 'Enter the 4-digit PIN.'; return; }
+    } else {
+      hostAddr = $('#manualHost').value.trim(); pin = manualPin() || new URLSearchParams(location.search).get('pin');
+      if (!hostAddr || !pin) { $('#joinErr').textContent = 'Scan the QR code first, or use "Enter manually".'; return; }
+    }
+    setBusy(true);
+    identity = { host: hostAddr, port: null, pin: pin, name: name };
+    pendingJoin = { name: name, pin: pin };
+    stopScanner();
+    if (ws && connOpen) doJoin(name, pin); else connect(hostAddr);
+  };
+  function doJoin(name, pin) {
+    // Always JOIN_REQUEST: under an auto-approval room the host admits immediately (so this is
+    // indistinguishable from JOIN_ROOM and the wait is a brief flash), and under a host-approved
+    // room it correctly queues for approval — this works without the client needing to already
+    // know which mode the room uses, which a manually-entered address/PIN has no way to know.
+    send('JOIN_REQUEST', { playerName: name, deviceId: deviceId(), pin: pin });
+    go('pending');
+  }
+  function deviceId() {
+    var d = lsGet('tambola.deviceId'); if (d) return d;
+    d = T.uuid(); lsSet('tambola.deviceId', d); return d;
+  }
+  $('#btnPendingBack').onclick = function () { manualClose = true; try { ws.close(); } catch (e) {} identity = null; pendingJoin = null; go('join'); };
+  $('#btnLeaveWait').onclick = function () {
+    if (identity) send('QUIT_GAME', { playerId: identity.playerId });
+    manualClose = true; try { ws.close(); } catch (e) {}
+    identity = null; lsDel(KEY.session); go('join');
+  };
+
+  // preload from a QR-carried link (?pin=&mode=) if the page itself was opened via the join URL
+  (function () {
+    var q = new URLSearchParams(location.search);
+    if (q.get('pin')) { $('#manualHost').value = location.host; setJoinTarget(location.host, q.get('pin')); }
+  })();
+  setTab('scan');
+
+  // auto-resume a session that dropped mid-game (page reload / backgrounding)
+  (function tryResume() {
+    var raw = lsGet(KEY.session); if (!raw) return;
+    try {
+      var id = JSON.parse(raw);
+      if (id && id.playerId && id.host) { identity = id; connect(id.host); go('wait'); }
+    } catch (e) {}
+  })();
+
+  // ---------- waiting lobby ----------
+  function renderWaitList() {
+    $('#waitYou').textContent = identity ? ('Joined as ' + identity.name) : '';
+    $('#waitList').innerHTML = (net.rankings || []).map(function (r) { return '<li>' + esc(r.playerName) + (identity && r.playerId === identity.playerId ? ' (you)' : '') + '</li>'; }).join('');
+  }
+
+  // ---------- in-game ----------
+  var ticketApi = null;
+  function buildTicket() {
+    marks = {};
+    ticketApi = Ticket.render($('#ticketHost'), net.ticket, { onTap: onTapCell });
+    applyFontScale();
+  }
+  // The ticket's own width:height ratio (including the paper's padding, not just the grid) is
+  // about 2.49:1. Size it in JS rather than pure CSS so it fits whichever of the available width
+  // or height is tighter — on a short landscape phone, height is usually the binding constraint,
+  // and a plain width:100% would make the ticket taller than the space left for it and clip it.
+  var TICKET_RATIO = 2.49;
+  function fitTicketBox() {
+    if (curScreen !== 'game') return;
+    var host = $('#g-ticket'); if (!host) return;
+    var box = host.querySelector('.ticket-box'); if (!box) return;
+    var availW = host.clientWidth, availH = host.clientHeight;
+    if (!availW || !availH) return;
+    var w = Math.min(availW, availH * TICKET_RATIO);
+    box.style.width = Math.max(0, Math.floor(w)) + 'px';
+  }
+  window.addEventListener('resize', fitTicketBox);
+  window.addEventListener('orientationchange', function () { fitTicketBox(); setTimeout(fitTicketBox, 300); });
+  function onTapCell(n, el) {
+    var called = net.calledNumbersSoFar.indexOf(n) >= 0;
+    if (!called) {
+      el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake');
+      Sfx.wrong(); Haptic.double();
+      return;   // no text explanation — 07 §9.3 is explicit that this is intentional
+    }
+    if (marks[n]) {
+      marks[n] = false; el.classList.remove('marked'); el.classList.add('unmarking');
+      Sfx.unmark(); setTimeout(function () { el.classList.remove('unmarking'); }, 220);
+    } else {
+      marks[n] = true; el.classList.add('marked', 'drawing');
+      Sfx.mark(); Haptic.light();
+      setTimeout(function () { el.classList.remove('drawing'); }, 320);
+    }
+    el.setAttribute('aria-pressed', String(!!marks[n]));
+  }
+  function renderCurrent() {
+    $('#curNum').textContent = net.lastNumber != null ? net.lastNumber : '–';
+    $('#callCount').textContent = net.calledNumbersSoFar.length + ' of 90 called';
+  }
+  function renderClaimButtons() {
+    var s = net.settings || {}; var pe = (s.prizesEnabled) || {};
+    var host = $('#claimBtns'); host.innerHTML = '';
+    T.PRIZE_ORDER.forEach(function (k) {
+      if (pe[k] === false) return;
+      var taken = !!prizesResolved[k];
+      var b = document.createElement('button'); b.className = 'btn' + (taken ? ' ghost' : ''); b.textContent = T.PRIZES[k].label; b.disabled = taken || net.gameStatus !== 'in_progress';
+      b.onclick = function () { b.classList.add('press'); setTimeout(function () { b.classList.remove('press'); }, 160); send('CLAIM_PRIZE', { playerId: identity.playerId, prizeType: k }); };
+      host.appendChild(b);
+    });
+  }
+  $('#rowBtns').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    var row = b.dataset.row; if (rowUsed[row]) return;
+    rowUsed[row] = true; b.disabled = true; b.classList.add('press');
+    send('ANNOUNCE', { playerId: identity.playerId, playerName: identity.name, row: row });
+  });
+  function renderCallPanel() { /* GAME_PAUSE/RESUME only need the claim buttons + banner state, handled inline */ renderClaimButtons(); }
+  function renderAll() { renderCurrent(); renderClaimButtons(); }
+
+  $('#quitBtn').onclick = function () {
+    Fx.modal('<h3>Quit the game?</h3><p>You\'ll lose your progress in this round.</p>', [{ label: 'Cancel', value: false, cls: 'ghost' }, { label: 'Quit', value: true, cls: 'danger' }]).then(function (ok) {
+      if (!ok) return;
+      send('QUIT_GAME', { playerId: identity.playerId });
+      setTimeout(function () { manualClose = true; try { ws.close(); } catch (e) {} }, 60);
+      identity = null; lsDel(KEY.session); unlockBack();
+      try { if (document.exitFullscreen) document.exitFullscreen().catch(function () {}); } catch (e) {}
+      go('join');
+    });
+  };
+
+  // ---------- game over ----------
+  function renderOver() {
+    var fr = net.finalRankings || [];
+    $('#overTable tbody').innerHTML = fr.map(function (r, i) { return '<tr' + (i === 0 ? ' class="flash"' : '') + '><td>' + (i + 1) + '</td><td>' + esc(r.playerName) + '</td><td class="pts">' + r.points + '</td></tr>'; }).join('');
+  }
+  $('#btnBackJoin').onclick = function () { identity = null; lsDel(KEY.session); prizesResolved = {}; net = { gameStatus: 'lobby', calledNumbersSoFar: [], claimedPrizes: [], ticket: null, rankings: [] }; go('join'); };
+
+  // ---------- settings sheet (font size 100-150%, ambient audio default off) ----------
+  var fontPct = parseInt(lsGet(KEY.font) || '100', 10), ambientOn = lsGet(KEY.ambient) === '1';
+  function applyFontScale() { document.documentElement.style.setProperty('--tf', fontPct / 100); }
+  applyFontScale();
+  if (ambientOn) Sfx.ambientOn();
+  $('#btnSettings').onclick = function () {
+    var wrap = document.createElement('div'); wrap.className = 'modal-wrap';
+    wrap.innerHTML = '<div class="modal"><h3>Player settings</h3>' +
+      '<label class="field"><span class="lbl">Ticket text size (' + fontPct + '%)</span><input type="range" id="fontRange" min="100" max="150" step="5" value="' + fontPct + '"></label>' +
+      '<label class="switch" style="margin-top:6px"><input type="checkbox" id="ambToggle"><span class="track"></span><span>Ambient hall sound</span></label>' +
+      '<div class="row"><button class="btn" id="setClose">Done</button></div></div>';
+    document.body.appendChild(wrap);
+    var r = wrap.querySelector('#fontRange'), a = wrap.querySelector('#ambToggle'); a.checked = ambientOn;
+    r.oninput = function () { fontPct = +r.value; lsSet(KEY.font, fontPct); applyFontScale(); wrap.querySelector('.lbl').textContent = 'Ticket text size (' + fontPct + '%)'; };
+    a.onchange = function () { ambientOn = a.checked; lsSet(KEY.ambient, ambientOn ? '1' : '0'); if (ambientOn) { Sfx.unlock(); Sfx.ambientOn(); } else Sfx.ambientOff(); };
+    wrap.querySelector('#setClose').onclick = function () { wrap.remove(); };
+  };
+
+  // unlock audio + wake the screen on first touch (needed for iOS Safari policies)
+  var noSleep = null; try { noSleep = new NoSleep(); } catch (e) {}
+  document.addEventListener('pointerdown', function once() { Sfx.unlock(); try { if (noSleep) { var p = noSleep.enable(); if (p && p.catch) p.catch(function () {}); } } catch (e) {} }, { once: true, passive: true });
+
+  // ---------- fullscreen toggle (works on both phone and laptop browsers) ----------
+  (function () {
+    var btn = $('#btnFullscreen');
+    var canFs = !!(document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen);
+    if (!canFs) { btn.style.display = 'none'; return; }
+    function isFs() { return !!(document.fullscreenElement || document.webkitFullscreenElement); }
+    function update() { btn.textContent = isFs() ? '⤢' : '⛶'; btn.setAttribute('aria-label', isFs() ? 'Exit fullscreen' : 'Enter fullscreen'); }
+    btn.onclick = function () {
+      if (!isFs()) {
+        var req = document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen;
+        var p = req.call(document.documentElement); if (p && p.catch) p.catch(function () {});
+      } else {
+        var exit = document.exitFullscreen || document.webkitExitFullscreen;
+        var p2 = exit.call(document); if (p2 && p2.catch) p2.catch(function () {});
+      }
+    };
+    document.addEventListener('fullscreenchange', update);
+    document.addEventListener('webkitfullscreenchange', update);
+    update();
+  })();
+
+  applyOrientationGate();
+  window.__player = { get identity() { return identity; }, get net() { return net; }, get curScreen() { return curScreen; } };
+})();
+</script>
+</body>
+</html>

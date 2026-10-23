@@ -1,0 +1,115 @@
+/* Design tokens — exactly the hex values in 08_DESIGN_SYSTEM.md §1. Nothing else is introduced;
+   the alpha variants below are the same tokens at lower opacity. */
+:root {
+  --teal: #0B3D3C;        /* App chrome — primary */
+  --navy: #123C69;        /* App chrome — secondary */
+  --paper: #FDF6E3;       /* Ticket background */
+  --gold: #E0A458;        /* Accent */
+  --ok: #2ECC71;          /* Connected */
+  --bad: #E74C3C;         /* Disconnected */
+  --quit-bg: #111111;     /* Quit row background (also used as ink) */
+  --quit-tx: #CCCCCC;     /* Quit row text */
+
+  --paper-90: rgba(253,246,227,.90); --paper-70: rgba(253,246,227,.70); --paper-50: rgba(253,246,227,.50);
+  --paper-20: rgba(253,246,227,.20); --paper-12: rgba(253,246,227,.12); --paper-06: rgba(253,246,227,.06);
+  --gold-40: rgba(224,164,88,.40); --gold-20: rgba(224,164,88,.20);
+  --navy-70: rgba(18,60,105,.70); --navy-45: rgba(18,60,105,.45);
+  --ink-60: rgba(17,17,17,.60); --ink-35: rgba(17,17,17,.35);
+  --dim-35: rgba(204,204,204,.35);
+
+  --serif: "Rockwell", "Clarendon", "Bookman Old Style", "Roboto Slab", Georgia, "Times New Roman", serif;
+  --sans: "Avenir Next", "Segoe UI", "Helvetica Neue", Roboto, system-ui, -apple-system, Arial, sans-serif;
+
+  --pop-ms: 250ms; --draw-ms: 1000ms; --x-draw-ms: 300ms; --x-fade-ms: 200ms; --shake-ms: 150ms; --press-ms: 150ms;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; height: 100%; background: var(--teal); color: var(--paper); font-family: var(--sans); font-size: 16px; line-height: 1.45; }
+body { overflow-x: hidden; }
+button, input, select { font: inherit; color: inherit; }
+h1, h2, h3 { font-family: var(--serif); font-weight: 700; letter-spacing: .01em; margin: 0; line-height: 1.15; }
+h2 { font-size: 1.35rem; } h3 { font-size: 1.05rem; }
+.hidden { display: none !important; }
+.muted { color: var(--paper-70); }
+.small { font-size: .85rem; }
+:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; border-radius: 4px; }
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: .5rem; min-height: 44px; padding: .55rem 1.1rem;
+  border: 2px solid var(--gold); border-radius: 10px; background: var(--gold); color: var(--quit-bg);
+  font-weight: 700; cursor: pointer; transition: transform var(--press-ms) ease-out;
+}
+.btn:disabled { opacity: .4; cursor: not-allowed; }
+.btn.ghost { background: transparent; color: var(--paper); border-color: var(--paper-50); }
+.btn.danger { background: transparent; border-color: var(--bad); color: var(--paper); }
+.btn.small { min-height: 34px; padding: .25rem .7rem; font-size: .85rem; border-radius: 8px; }
+.btn.big { min-height: 64px; font-size: 1.35rem; padding: .8rem 2rem; border-radius: 14px; font-family: var(--serif); }
+.btn.press { animation: press var(--press-ms) ease-out; }
+@keyframes press { 0% { transform: scale(1); } 50% { transform: scale(1.08); } 100% { transform: scale(1); } }
+
+.panel { background: var(--navy-45); border: 1px solid var(--paper-12); border-radius: 12px; padding: 14px; }
+.panel > h3 { margin-bottom: 10px; }
+
+input[type=text], input[type=number], input[type=tel] {
+  width: 100%; min-height: 44px; padding: .5rem .75rem; border-radius: 8px; border: 2px solid var(--paper-20);
+  background: var(--teal); color: var(--paper);
+}
+input:focus { border-color: var(--gold); outline: none; }
+label.field { display: block; margin-bottom: 14px; }
+label.field > span.lbl { display: block; font-weight: 600; margin-bottom: 4px; }
+.caption { color: var(--paper-70); font-size: .85rem; margin-top: 4px; }
+
+.seg { display: inline-flex; border: 2px solid var(--paper-20); border-radius: 10px; overflow: hidden; flex-wrap: wrap; }
+.seg button { background: transparent; border: 0; padding: .5rem .9rem; min-height: 40px; cursor: pointer; }
+.seg button[aria-pressed=true] { background: var(--gold); color: var(--quit-bg); font-weight: 700; }
+.switch { display: inline-flex; align-items: center; gap: .6rem; cursor: pointer; min-height: 40px; }
+.switch input { position: absolute; opacity: 0; }
+.switch .track { width: 46px; height: 26px; border-radius: 13px; background: var(--paper-20); position: relative; transition: background .15s; flex: none; }
+.switch .track::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: var(--paper); transition: transform .15s; }
+.switch input:checked + .track { background: var(--gold); }
+.switch input:checked + .track::after { transform: translateX(20px); background: var(--quit-bg); }
+.switch input:focus-visible + .track { outline: 3px solid var(--gold); outline-offset: 2px; }
+
+.dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; flex: none; vertical-align: middle; }
+.dot.connected { background: var(--ok); } .dot.disconnected { background: var(--bad); }
+
+.modal-wrap { position: fixed; inset: 0; background: var(--ink-60); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 60; }
+.modal { background: var(--teal); border: 2px solid var(--gold); border-radius: 14px; padding: 20px; max-width: 460px; width: 100%; max-height: 90vh; overflow: auto; }
+.modal h3 { margin-bottom: 8px; } .modal .row { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; flex-wrap: wrap; }
+
+/* Number balls */
+.ball {
+  width: var(--ball, 150px); height: var(--ball, 150px); border-radius: 50%; display: grid; place-items: center;
+  background: radial-gradient(circle at 35% 30%, var(--paper) 0 12%, var(--gold) 13% 100%);
+  color: var(--quit-bg); font-family: var(--serif); font-weight: 800; font-size: calc(var(--ball, 150px) * .46);
+  box-shadow: inset 0 -8px 0 var(--ink-35), 0 6px 0 var(--ink-35);
+}
+.pop-in { animation: popIn var(--pop-ms) ease-out; }
+@keyframes popIn { from { transform: scale(.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+/* 1–90 board (host) and mini-grid (player) */
+.board { display: grid; grid-template-columns: repeat(10, 1fr); gap: 4px; }
+.board .c { display: grid; place-items: center; aspect-ratio: 1.15; border-radius: 6px; background: var(--navy-70); color: var(--paper); font-weight: 700; font-size: clamp(.7rem, 1.6vw, 1.05rem); border: 1px solid var(--paper-12); }
+.board .c.called { background: var(--dim-35); color: var(--quit-tx); border-color: transparent; text-decoration: line-through; text-decoration-thickness: 1px; }
+.board.mini { gap: 2px; } .board.mini .c { font-size: clamp(.5rem, 1.9vh, .7rem); border-radius: 3px; aspect-ratio: auto; height: clamp(12px, 3.3vh, 20px); }
+
+/* Leaderboard rows: three distinct connection states (08 §2) */
+.lb { width: 100%; border-collapse: separate; border-spacing: 0 4px; }
+.lb th { text-align: left; font-weight: 600; font-size: .8rem; color: var(--paper-70); padding: 2px 8px; }
+.lb td { padding: 8px; background: var(--navy-70); }
+.lb td:first-child { border-radius: 8px 0 0 8px; } .lb td:last-child { border-radius: 0 8px 8px 0; }
+.lb tr.disconnected td { opacity: .6; }
+.lb tr.quit td { background: var(--quit-bg); color: var(--quit-tx); opacity: 1; }
+.lb td.pts { font-family: var(--serif); font-weight: 800; font-size: 1.1rem; text-align: right; }
+.lb tr.flash td { animation: flash 1.4s ease-out; }
+@keyframes flash { 0%, 40% { background: var(--gold); color: var(--quit-bg); } 100% { } }
+.chip { display: inline-block; font-size: .72rem; padding: 1px 7px; border-radius: 9px; border: 1px solid var(--gold-40); color: var(--gold); margin: 1px 3px 1px 0; white-space: nowrap; }
+tr.quit .chip { color: var(--quit-tx); border-color: var(--dim-35); }
+
+/* Toasts */
+.toast { background: var(--teal); border: 2px solid var(--gold); border-radius: 10px; padding: 6px 12px; font-weight: 600; max-width: 280px; box-shadow: 0 4px 0 var(--ink-35); }
+.toast.win { background: var(--gold); color: var(--quit-bg); }
+.toast-in { animation: popIn var(--pop-ms) ease-out; }
+
+canvas.confetti { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 80; }
+
+@media (prefers-reduced-motion: reduce) { .lb tr.flash td { animation: none; } }

@@ -1,0 +1,783 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Ctext y=%27.9em%27 font-size=%2790%27%3E%F0%9F%8E%AB%3C/text%3E%3C/svg%3E">
+<title>Tambola — Host</title>
+<link rel="stylesheet" href="theme.css">
+<link rel="stylesheet" href="ticket.css">
+<style>
+  #app { max-width: 1400px; margin: 0 auto; padding: 0 16px 16px; min-height: 100%; }
+  .topbar { position: sticky; top: 0; z-index: 30; display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 12px 0 10px; margin-bottom: 4px; background: var(--teal); }
+  .brand { font-family: var(--serif); font-size: 1.5rem; font-weight: 800; color: var(--gold); }
+  .relay { font-size: .85rem; display: flex; gap: 6px; align-items: center; color: var(--paper-70); }
+  section.screen { display: none; }
+  section.screen.on { display: block; }
+
+  /* landing */
+  .hero { display: grid; gap: 28px; align-items: center; padding: 20px 0 8px; }
+  .hero h1 { font-size: clamp(3.2rem, 11vw, 6.5rem); color: var(--gold); letter-spacing: .02em; }
+  .hero p.lead { font-size: 1.15rem; max-width: 34ch; color: var(--paper-90); margin: 12px 0 26px; }
+  .hero .sample { transform: rotate(-2.2deg); filter: drop-shadow(0 10px 0 var(--ink-35)); max-width: 620px; width: 100%; }
+  .hero .actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  @media (min-width: 900px) { .hero { grid-template-columns: 1fr 1.15fr; } }
+  .notice { border: 2px solid var(--gold); border-radius: 12px; padding: 12px 14px; margin-top: 18px; max-width: 560px; }
+
+  /* explainer */
+  #s-explainer { position: fixed; inset: 0; background: var(--teal); z-index: 50; padding: 16px; flex-direction: column; }
+  #s-explainer.on { display: flex; }
+  .ex-top { display: flex; justify-content: flex-end; }
+  .ex-track { flex: 1; display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; gap: 0; }
+  .ex-track::-webkit-scrollbar { display: none; }
+  .ex-card { flex: 0 0 100%; scroll-snap-align: center; display: grid; place-items: center; padding: 20px; }
+  .ex-card div { max-width: 30ch; font-family: var(--serif); font-size: clamp(1.4rem, 4.2vw, 2.1rem); line-height: 1.3; text-align: center; }
+  .ex-bottom { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 52px; }
+  .ex-dots { display: flex; gap: 8px; } .ex-dots i { width: 10px; height: 10px; border-radius: 50%; background: var(--paper-20); }
+  .ex-dots i.on { background: var(--gold); }
+
+  /* settings */
+  .form { max-width: 680px; margin: 0 auto; }
+  .form .panel { margin-bottom: 14px; }
+  .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+  .grid2 label.switch { white-space: nowrap; }
+  .money { display: grid; grid-template-columns: repeat(3, 1fr) 90px; gap: 10px; }
+  .links { display: flex; gap: 18px; justify-content: center; margin: 16px 0; }
+  .link { background: none; border: 0; color: var(--gold); text-decoration: underline; cursor: pointer; padding: 6px; min-height: 40px; }
+  input[type=range] { width: 100%; accent-color: var(--gold); }
+
+  /* lobby */
+  .lobby { display: grid; gap: 16px; }
+  @media (min-width: 700px) { .lobby { grid-template-columns: 1fr 1fr; align-items: start; } }
+  .pin { font-family: var(--serif); font-weight: 800; font-size: clamp(3.4rem, 12vw, 6rem); color: var(--gold); letter-spacing: .12em; line-height: 1; }
+  .qrbox { background: var(--paper); border-radius: 12px; padding: 12px; width: min(100%, 320px); margin: 12px 0; }
+  .qrbox svg { display: block; width: 100%; height: auto; }
+  .urltxt { font-family: var(--sans); font-size: 1.05rem; word-break: break-all; }
+  .plist { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; max-height: 50vh; overflow: auto; }
+  .plist li { display: flex; align-items: center; gap: 10px; padding: 8px 10px; background: var(--navy-70); border-radius: 8px; }
+  .plist li .nm { flex: 1; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .st { font-size: .85rem; color: var(--paper-70); }
+
+  /* game */
+  #g-layout { display: grid; gap: 14px; }
+  #g-layout .col { display: contents; }
+  .scroll { max-height: 60vh; overflow: auto; }
+  @media (min-width: 700px) {
+    #g-layout { grid-template-columns: 60fr 40fr; align-items: start; }
+    #g-layout .col { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+    #g-layout .col.right { position: sticky; top: 64px; }
+    .scroll { max-height: none; }
+    #g-layout .col.right .scroll.lbwrap { max-height: 40vh; }
+    #g-layout .col.right .scroll.smallwrap { max-height: 20vh; }
+  }
+  .callrow { display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
+  #curBall { --ball: clamp(120px, 20vw, 190px); }
+  #curBall.spinning { animation: tumble var(--draw-ms) cubic-bezier(.08,.7,.25,1) forwards; }
+  @keyframes tumble { from { transform: rotate(0) scale(.92); } 70% { transform: rotate(900deg) scale(1.02); } to { transform: rotate(1080deg) scale(1); } }
+  .callctl { display: grid; gap: 10px; min-width: 200px; }
+  #countdown { font-family: var(--serif); font-size: 1.5rem; color: var(--gold); min-height: 52px; display: flex; align-items: center; }
+  .adminbar { display: flex; flex-wrap: wrap; gap: 10px; }
+  .banner { margin-top: 10px; padding: 8px 12px; border: 2px solid var(--gold); border-radius: 10px; }
+  .claims { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+  .claims li { display: flex; gap: 8px; align-items: center; justify-content: space-between; padding: 8px 10px; background: var(--navy-70); border-radius: 8px; font-size: .92rem; }
+  .claims li .acc { color: var(--ok); font-weight: 700; } .claims li .rej { color: var(--bad); font-weight: 700; }
+  #hostToasts { position: fixed; top: 10px; left: 50%; transform: translateX(-50%); display: grid; gap: 6px; justify-items: center; z-index: 70; pointer-events: none; }
+
+  /* game over */
+  .over { max-width: 760px; margin: 0 auto; }
+  .over table { width: 100%; border-collapse: separate; border-spacing: 0 5px; }
+  .over td, .over th { padding: 10px; text-align: left; } .over td { background: var(--navy-70); font-size: 1.05rem; }
+  .over td:first-child { border-radius: 8px 0 0 8px; } .over td:last-child { border-radius: 0 8px 8px 0; }
+  .over td.num, .over th.num { text-align: right; }
+  .over tr.first td { background: var(--gold); color: var(--quit-bg); font-weight: 700; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="topbar">
+    <div class="brand">Tambola</div>
+    <div style="display:flex; align-items:center; gap:10px;">
+      <div class="relay" id="relay"><span class="dot disconnected"></span><span id="relayTxt">Connecting…</span></div>
+      <button class="btn ghost small" id="btnFullscreen" aria-label="Toggle fullscreen">⛶</button>
+    </div>
+  </div>
+
+  <!-- Landing: the very first thing the host sees -->
+  <section class="screen on" id="s-landing">
+    <div class="hero">
+      <div>
+        <h1>Tambola</h1>
+        <p class="lead">Housie for the whole room. It runs on your Wi-Fi — no internet needed.</p>
+        <div class="actions">
+          <button class="btn big" id="btnCreate">Create a game</button>
+          <button class="btn ghost hidden" id="btnResume">Resume last game</button>
+        </div>
+        <p class="small muted" style="margin-top:16px"><a class="link" href="/play" style="padding:0;text-decoration:underline">Joining a game? Open the player page</a></p>
+        <div class="notice hidden" id="notLocal"><strong>This isn't the host computer.</strong><br>Hosting only works on the computer that's running the Tambola server. To play, scan the QR code on the host's screen.</div>
+        <div class="notice hidden" id="notReady"><strong>Can't reach the Tambola server.</strong><br>Make sure the server window is still open, then reload this page.</div>
+      </div>
+      <div class="sample" id="sampleTicket" aria-hidden="true"></div>
+    </div>
+  </section>
+
+  <!-- First-time explainer (06_UI_HOST §8.2) -->
+  <section class="screen" id="s-explainer" aria-label="How this works">
+    <div class="ex-top"><button class="btn ghost small" id="exSkip">Skip</button></div>
+    <div class="ex-track" id="exTrack"></div>
+    <div class="ex-bottom"><div class="ex-dots" id="exDots"></div><button class="btn" id="exNext">Next</button></div>
+  </section>
+
+  <!-- Settings (06_UI_HOST §8.3) -->
+  <section class="screen" id="s-settings">
+    <div class="form">
+      <h2 style="margin-bottom:14px" id="setTitle">Game settings</h2>
+      <div class="panel" id="setBody"></div>
+      <div class="links"><button class="link" id="lnkHow">How this works</button><button class="link" id="lnkAbout">About</button></div>
+      <div style="display:flex; gap:12px; justify-content:space-between; flex-wrap:wrap">
+        <button class="btn ghost" id="btnSetBack">Back</button>
+        <button class="btn big" id="btnOpenLobby">Open the lobby</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Lobby (06_UI_HOST §8.4) -->
+  <section class="screen" id="s-lobby">
+    <div class="lobby">
+      <div class="panel">
+        <h3>Players scan this to join</h3>
+        <div class="qrbox" id="qr" aria-label="Join QR code"></div>
+        <div class="muted small">Room PIN</div>
+        <div class="pin" id="pin">----</div>
+        <p class="urltxt" style="margin:12px 0 4px"><strong id="ipport"></strong></p>
+        <p class="caption" style="margin:0" id="joinUrl"></p>
+        <div id="netPick" class="hidden" style="margin-top:10px"><label class="small muted">Network<br><select id="netSel" style="min-height:40px;background:var(--teal);border:2px solid var(--paper-20);border-radius:8px;padding:4px 8px"></select></label></div>
+        <p class="caption hidden" id="noNet">No Wi-Fi or LAN address was found on this computer. Connect it to a network, or turn on its hotspot, then press Refresh.</p>
+      </div>
+      <div class="panel">
+        <h3>Players <span class="muted" id="pcount"></span></h3>
+        <ul class="plist" id="plist"></ul>
+        <p class="caption" id="pempty">Nobody has joined yet. Ask players to scan the code.</p>
+        <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:14px">
+          <button class="btn big" id="btnStart" disabled>Start game</button>
+          <button class="btn ghost" id="btnLobbySettings">Settings</button>
+          <button class="btn danger" id="btnClose">Close room</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- In-game (06_UI_HOST §8.5) -->
+  <section class="screen" id="s-game">
+    <div id="g-layout">
+      <div class="col left">
+        <div class="panel">
+          <div class="callrow">
+            <div class="ball" id="curBall"><span id="curNum">–</span></div>
+            <div class="callctl">
+              <button class="btn big" id="btnCall">Call next number</button>
+              <div id="countdown" class="hidden"></div>
+              <div class="muted small" id="callInfo"></div>
+            </div>
+          </div>
+          <div class="banner hidden" id="banner"></div>
+        </div>
+        <div class="panel"><h3>Called numbers</h3><div class="board" id="board" role="grid" aria-label="Numbers 1 to 90"></div></div>
+        <div class="panel"><h3>Game controls</h3>
+          <div class="adminbar"><button class="btn ghost" id="btnPause">Pause</button><button class="btn danger" id="btnEnd">End game</button></div>
+        </div>
+      </div>
+      <div class="col right">
+        <div class="panel"><h3>Leaderboard</h3><div class="scroll lbwrap"><table class="lb" id="lb"><thead><tr><th>#</th><th>Player</th><th>Prizes</th><th style="text-align:right">Points</th></tr></thead><tbody></tbody></table></div></div>
+        <div class="panel"><h3>Players</h3><div class="scroll smallwrap"><ul class="plist" id="gplist" style="max-height:none"></ul></div></div>
+        <div class="panel"><h3>Claims</h3><div class="scroll smallwrap"><ul class="claims" id="claims"></ul><p class="caption" id="claimsEmpty">No claims yet.</p></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Game over (06_UI_HOST §8.6) -->
+  <section class="screen" id="s-over">
+    <div class="over">
+      <h2 style="margin-bottom:6px">Game over</h2>
+      <p class="muted" id="overNote"></p>
+      <table><thead><tr><th>#</th><th>Player</th><th class="num">Points</th><th class="num">Prize</th></tr></thead><tbody id="overBody"></tbody></table>
+      <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:18px">
+        <button class="btn" id="btnNew">New game</button>
+        <button class="btn ghost" id="btnShare">Share results</button>
+      </div>
+    </div>
+  </section>
+</div>
+<div id="hostToasts" aria-live="polite"></div>
+
+<script src="qrcode.js"></script>
+<script src="nosleep.js"></script>
+<script src="engine.js"></script>
+<script src="fx.js"></script>
+<script src="ticket.js"></script>
+<script>
+(function () {
+  'use strict';
+  var T = Tambola, esc = Fx.esc;
+  var $ = function (s) { return document.querySelector(s); };
+  var KEY = { settings: 'tambola.host.settings', seen: 'tambola.host.explainerSeen', game: 'tambola.host.game' };
+  function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  function lsDel(k) { try { localStorage.removeItem(k); } catch (e) {} }
+
+  // ---------- settings (data/settings_schema.json; persisted like shared_preferences) ----------
+  function loadSettings() {
+    var d = JSON.parse(JSON.stringify(T.DEFAULT_SETTINGS));
+    try {
+      var s = JSON.parse(lsGet(KEY.settings) || 'null');
+      if (s) { Object.keys(d).forEach(function (k) { if (s[k] === undefined) return; if (d[k] && typeof d[k] === 'object') Object.keys(d[k]).forEach(function (kk) { if (s[k][kk] !== undefined) d[k][kk] = s[k][kk]; }); else d[k] = s[k]; }); }
+    } catch (e) {}
+    return d;
+  }
+  var settings = loadSettings();
+  function autoConn() { return settings.maxPlayers <= 8 ? 'hotspot' : 'router'; }
+  function syncConn() { if (!settings.connectionMethodTouched) settings.connectionMethod = autoConn(); }
+  function saveSettings() { syncConn(); lsSet(KEY.settings, JSON.stringify(settings)); }
+  syncConn();
+
+  // ---------- state ----------
+  var game = null, curScreen = 'landing', explainerAfter = null;
+  var relay = { ws: null, up: false, replaced: false, conns: {} };
+  var net = { addresses: [], port: location.port, localRequest: true, ok: false, ipChoice: null };
+  var noSleep = null; try { noSleep = new NoSleep(); } catch (e) {}
+
+  var transport = {
+    to: function (c, m) { send({ k: 'to', c: c, m: m }); },
+    toMany: function (cs, m) { send({ k: 'many', cs: cs, m: m }); },
+    all: function (m) { send({ k: 'all', m: m }); },
+    kick: function (c) { send({ k: 'kick', c: c }); }
+  };
+  function send(o) { if (relay.ws && relay.up) relay.ws.send(JSON.stringify(o)); }
+
+  // ---------- screens ----------
+  function go(name) {
+    curScreen = name;
+    ['landing', 'explainer', 'settings', 'lobby', 'game', 'over'].forEach(function (n) { $('#s-' + n).classList.toggle('on', n === name); });
+    window.scrollTo(0, 0);
+    render();
+  }
+  var raf = 0;
+  function scheduleRender() { if (raf) return; raf = requestAnimationFrame(function () { raf = 0; render(); }); }
+  function render() {
+    if (game && (curScreen === 'lobby' || curScreen === 'game' || curScreen === 'over')) {
+      var want = game.gameStatus === 'lobby' ? 'lobby' : game.gameStatus === 'ended' ? 'over' : 'game';
+      if (curScreen !== want) { curScreen = want; ['landing', 'explainer', 'settings', 'lobby', 'game', 'over'].forEach(function (n) { $('#s-' + n).classList.toggle('on', n === want); }); }
+    }
+    if (curScreen === 'lobby') renderLobby();
+    else if (curScreen === 'game') renderGame();
+    else if (curScreen === 'over') renderOver();
+    else if (curScreen === 'landing') renderLanding();
+  }
+  function renderRelay() {
+    var d = $('#relay .dot'), t = $('#relayTxt');
+    d.className = 'dot ' + (relay.up ? 'connected' : 'disconnected');
+    t.textContent = relay.replaced ? 'Another host page took over' : relay.up ? 'Server connected' : (net.localRequest ? 'Connecting…' : 'Not the host computer');
+  }
+
+  // ---------- relay connection ----------
+  function fetchInfo() {
+    return fetch('/info', { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (i) {
+      net.addresses = i.addresses || []; net.port = i.port; net.localRequest = i.localRequest; net.ok = true;
+    }).catch(function () { net.ok = false; });
+  }
+  function connectRelay() {
+    if (!net.localRequest) { renderRelay(); return; }
+    var ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/host');
+    relay.ws = ws;
+    ws.onopen = function () { relay.up = true; relay.replaced = false; renderRelay(); };
+    ws.onmessage = function (e) { var m; try { m = JSON.parse(e.data); } catch (_) { return; } onRelay(m); };
+    ws.onclose = function (ev) {
+      relay.up = false;
+      if (ev.code === 4000) { relay.replaced = true; renderRelay(); return; }
+      renderRelay(); setTimeout(connectRelay, 1500);
+    };
+    ws.onerror = function () {};
+  }
+  function onRelay(m) {
+    if (m.k === 'hello') { relay.conns = {}; (m.conns || []).forEach(function (c) { relay.conns[c] = 1; }); if (game) game.reconcileConnections(m.conns || []); }
+    else if (m.k === 'open') relay.conns[m.c] = 1;
+    else if (m.k === 'close') { delete relay.conns[m.c]; if (game) game.handleClose(m.c); }
+    else if (m.k === 'msg') {
+      if (game) game.handleMessage(m.c, m.m);
+      else if (m.m && (m.m.type === 'JOIN_ROOM' || m.m.type === 'JOIN_REQUEST')) send({ k: 'to', c: m.c, m: { type: 'JOIN_REJECTED', payload: { reason: 'No game is open right now' }, timestamp: Date.now() } });
+    }
+  }
+
+  // ---------- 5-tick worker: heartbeat + auto-call countdown (Worker timers are not throttled in background tabs) ----------
+  var ticker = null, lastT = 0, hb = 0;
+  function startAux() {
+    if (ticker) return;
+    lastT = performance.now();
+    var onTick = function () {
+      var now = performance.now(), dt = now - lastT; lastT = now;
+      if (!game) return;
+      game.tick(dt);
+      if (++hb >= 20) { hb = 0; game.heartbeat(); }          // every 2 s
+      if (curScreen === 'game') updateCallPanel();
+    };
+    try {
+      var blob = new Blob(['setInterval(function(){postMessage(0)},100)'], { type: 'text/javascript' });
+      ticker = new Worker(URL.createObjectURL(blob)); ticker.onmessage = onTick;
+    } catch (e) { ticker = { fallback: setInterval(onTick, 100) }; }
+    refreshVoices();
+  }
+
+  // ---------- host-only call audio: English digits -> Telugu -> English (09 §1) ----------
+  var tts = { te: null, en: null, teChecked: false, token: 0 };
+  function refreshVoices() {
+    if (!('speechSynthesis' in window)) return;
+    var vs = speechSynthesis.getVoices() || [];
+    tts.te = vs.filter(function (v) { return /^te([-_]|$)/i.test(v.lang); })[0] || null;
+    tts.en = vs.filter(function (v) { return /^en[-_]IN/i.test(v.lang); })[0] || vs.filter(function (v) { return /^en/i.test(v.lang); })[0] || null;
+  }
+  if ('speechSynthesis' in window) { try { speechSynthesis.onvoiceschanged = refreshVoices; } catch (e) {} }
+  function speak(text, voice, lang) {
+    return new Promise(function (res) {
+      if (!('speechSynthesis' in window)) return res();
+      var u = new SpeechSynthesisUtterance(text), done = false;
+      u.lang = voice ? voice.lang : lang; if (voice) u.voice = voice; u.rate = 0.9;
+      var fin = function () { if (!done) { done = true; clearTimeout(to); res(); } };
+      var to = setTimeout(fin, 7000);            // never hang the auto-call clock if the engine stays silent
+      u.onend = fin; u.onerror = fin;
+      try { speechSynthesis.speak(u); } catch (e) { fin(); }
+    });
+  }
+  function callOut(n) {
+    var my = ++tts.token;
+    try { if ('speechSynthesis' in window) speechSynthesis.cancel(); } catch (e) {}
+    refreshVoices();
+    var alive = function () { return my === tts.token; };
+    return speak(T.englishDigits(n), tts.en, 'en-IN')
+      .then(function () { if (!alive() || !tts.te) return; return speak(T.teluguWords(n), tts.te, 'te-IN'); })   // skipped silently if no Telugu voice is installed
+      .then(function () { if (!alive()) return; return speak(T.englishWords(n), tts.en, 'en-IN'); })
+      .then(function () { if (alive()) game.ttsDone(); });
+  }
+
+  // ---------- landing ----------
+  function renderLanding() {
+    $('#btnCreate').disabled = !net.localRequest || !net.ok;
+    $('#notLocal').classList.toggle('hidden', net.localRequest || !net.ok);
+    $('#notReady').classList.toggle('hidden', net.ok);
+    var saved = lsGet(KEY.game);
+    $('#btnResume').classList.toggle('hidden', !saved || !net.localRequest);
+    if (saved && !$('#btnResume').dataset.label) {
+      try { var s = JSON.parse(saved); $('#btnResume').textContent = 'Resume last game (PIN ' + s.pin + ', ' + s.players.length + ' player' + (s.players.length === 1 ? '' : 's') + ')'; $('#btnResume').dataset.label = 1; } catch (e) {}
+    }
+  }
+  function drawSample() {
+    var host = $('#sampleTicket'), t = T.generateTickets(1)[0];
+    var r = Ticket.render(host, t, { readonly: true });
+    T.shuffle(T.ticketNumbers(t).slice()).slice(0, 5).forEach(function (n) { r.cells[n].classList.add('marked'); });
+  }
+  function unlockMedia() { Sfx.unlock(); try { if (noSleep) { var p = noSleep.enable(); if (p && p.catch) p.catch(function () {}); } } catch (e) {} }
+
+  $('#btnCreate').onclick = function () {
+    unlockMedia();
+    var saved = lsGet(KEY.game);
+    var proceed = function () {
+      lsDel(KEY.game); $('#btnResume').dataset.label = '';
+      explainerAfter = function () { openSettings(false); };
+      if (!lsGet(KEY.seen)) openExplainer(); else explainerAfter();
+    };
+    if (saved) Fx.modal('<h3>Start a new game?</h3><p>Your last game will be discarded.</p>', [{ label: 'Cancel', value: false, cls: 'ghost' }, { label: 'Start new', value: true }]).then(function (ok) { if (ok) proceed(); });
+    else proceed();
+  };
+  $('#btnResume').onclick = function () {
+    unlockMedia();
+    try {
+      game = makeGame(JSON.parse(lsGet(KEY.game)));
+      game.reconcileConnections(Object.keys(relay.conns));
+      startAux(); go(game.gameStatus === 'lobby' ? 'lobby' : game.gameStatus === 'ended' ? 'over' : 'game');
+      if (game.gameStatus === 'paused') toast('Game restored and paused. Press Resume when everyone is back.');
+    } catch (e) { lsDel(KEY.game); Fx.modal('<h3>Could not restore the game</h3><p>The saved game was unreadable, so it has been cleared.</p>'); renderLanding(); }
+  };
+
+  // ---------- explainer ----------
+  var EX = [
+    'Numbers are called on your device only, in English → Telugu → English. Players just see the number appear.',
+    'Players tap their own ticket to mark numbers. There\'s no auto-marking.',
+    '\'Row Completed\' buttons are just for fun — they don\'t win anything. The Claim buttons are what win prizes.',
+    'You can require your approval before anyone joins, or let anyone with the PIN in instantly — set this in Settings.',
+    'For games over 8 players, use a travel router or existing Wi-Fi instead of your phone\'s hotspot — phone hotspots usually cap at 8–10 devices.'
+  ];
+  var exIdx = 0;
+  function openExplainer() {
+    var tr = $('#exTrack'); tr.innerHTML = EX.map(function (t) { return '<div class="ex-card"><div>' + esc(t) + '</div></div>'; }).join('');
+    $('#exDots').innerHTML = EX.map(function () { return '<i></i>'; }).join('');
+    exIdx = 0; tr.scrollLeft = 0; exUpdate(); go('explainer');
+  }
+  function exUpdate() {
+    Array.prototype.forEach.call($('#exDots').children, function (d, i) { d.classList.toggle('on', i === exIdx); });
+    $('#exNext').textContent = exIdx === EX.length - 1 ? 'Get started' : 'Next';
+  }
+  $('#exTrack').addEventListener('scroll', function () {
+    var i = Math.round(this.scrollLeft / Math.max(1, this.clientWidth)); if (i !== exIdx) { exIdx = Math.max(0, Math.min(EX.length - 1, i)); exUpdate(); }
+  });
+  function exFinish() { lsSet(KEY.seen, '1'); var f = explainerAfter; explainerAfter = null; if (f) f(); else go('settings'); }
+  $('#exSkip').onclick = exFinish;
+  $('#exNext').onclick = function () {
+    if (exIdx >= EX.length - 1) return exFinish();
+    var tr = $('#exTrack'); exIdx++; tr.scrollTo({ left: exIdx * tr.clientWidth, behavior: 'smooth' }); exUpdate();
+  };
+
+  // ---------- settings screen ----------
+  var settingsMode = 'new';    // 'new' (before the room exists) or 'edit' (from the lobby)
+  function openSettings(edit) {
+    settingsMode = edit ? 'edit' : 'new';
+    $('#setTitle').textContent = edit ? 'Edit settings' : 'Game settings';
+    $('#btnOpenLobby').textContent = edit ? 'Save settings' : 'Open the lobby';
+    buildSettings(); go('settings');
+  }
+  function seg(host, options, labels, get, set) {
+    var wrap = document.createElement('div'); wrap.className = 'seg'; wrap.setAttribute('role', 'group');
+    options.forEach(function (o) {
+      var b = document.createElement('button'); b.type = 'button'; b.textContent = labels[o];
+      b.setAttribute('aria-pressed', String(get() === o));
+      b.onclick = function () { set(o); Array.prototype.forEach.call(wrap.children, function (x, i) { x.setAttribute('aria-pressed', String(options[i] === get())); }); };
+      wrap.appendChild(b);
+    });
+    host.appendChild(wrap);
+  }
+  function field(label, node, caption) {
+    var w = document.createElement('div'); w.className = 'field'; w.style.marginBottom = '18px';
+    var l = document.createElement('span'); l.className = 'lbl'; l.textContent = label; l.style.display = 'block'; l.style.fontWeight = '600'; l.style.marginBottom = '6px';
+    w.appendChild(l); w.appendChild(node);
+    if (caption) { var c = document.createElement('div'); c.className = 'caption'; c.id = caption.id || ''; c.textContent = caption.text || ''; w.appendChild(c); }
+    return w;
+  }
+  function sw(label, checked, onchange) {
+    var l = document.createElement('label'); l.className = 'switch';
+    l.innerHTML = '<input type="checkbox"><span class="track"></span><span></span>';
+    l.querySelector('input').checked = checked; l.lastChild.textContent = label;
+    l.querySelector('input').onchange = function () { onchange(this.checked); };
+    return l;
+  }
+  function numInput(val, min, max, onchange, extra) {
+    var i = document.createElement('input'); i.type = 'number'; i.inputMode = 'numeric'; i.min = min; if (max != null) i.max = max; i.value = val;
+    if (extra) Object.keys(extra).forEach(function (k) { i.setAttribute(k, extra[k]); });
+    i.oninput = function () { var v = parseInt(i.value, 10); if (!isNaN(v)) onchange(v, false); };
+    i.onblur = function () { var v = parseInt(i.value, 10); if (isNaN(v)) v = min; v = Math.max(min, max != null ? Math.min(max, v) : v); i.value = v; onchange(v, true); };
+    return i;
+  }
+  function buildSettings() {
+    var b = $('#setBody'); b.innerHTML = '';
+    var minPlayers = game ? Math.max(1, game.players.length) : 1;
+    // maxPlayers
+    var mp = numInput(settings.maxPlayers, minPlayers, 90, function (v) {
+      settings.maxPlayers = Math.max(minPlayers, Math.min(90, v)); saveSettings(); updateConnSeg();
+    }, { 'aria-label': 'Number of players' });
+    b.appendChild(field('Number of players', mp, { text: 'Up to 90 players.' }));
+    // connectionMethod (default follows maxPlayers live until the host picks one)
+    var cmHost = document.createElement('div'), capEl;
+    function updateConnSeg() {
+      cmHost.innerHTML = '';
+      seg(cmHost, ['hotspot', 'router'], { hotspot: 'Phone Hotspot', router: 'Travel Router / External Wi-Fi' },
+        function () { return settings.connectionMethod; },
+        function (o) { settings.connectionMethodTouched = true; settings.connectionMethod = o; saveSettings(); updateCaption(); });
+      updateCaption();
+    }
+    function updateCaption() { if (capEl) capEl.textContent = settings.connectionMethod === 'hotspot' ? 'Most phone hotspots support only 8–10 connected devices.' : ''; }
+    var cmField = field('Connection method', cmHost, { text: '' }); capEl = cmField.querySelector('.caption'); b.appendChild(cmField); syncConn(); updateConnSeg();
+    // prize money
+    var mh = document.createElement('div'); mh.className = 'money';
+    [['first', '1st'], ['second', '2nd'], ['third', '3rd']].forEach(function (p) {
+      var w = document.createElement('label'); w.innerHTML = '<span class="small muted">' + p[1] + '</span>';
+      w.appendChild(numInput(settings.prizeMoney[p[0]], 0, null, function (v) { settings.prizeMoney[p[0]] = v; saveSettings(); }, { 'aria-label': 'Prize money ' + p[1] })); mh.appendChild(w);
+    });
+    var cw = document.createElement('label'); cw.innerHTML = '<span class="small muted">Currency</span>';
+    var ci = document.createElement('input'); ci.type = 'text'; ci.maxLength = 4; ci.value = settings.prizeMoney.currency; ci.setAttribute('aria-label', 'Currency symbol');
+    ci.oninput = function () { settings.prizeMoney.currency = ci.value; saveSettings(); }; cw.appendChild(ci); mh.appendChild(cw);
+    b.appendChild(field('Prize money', mh));
+    // prizesEnabled
+    var pg = document.createElement('div'); pg.className = 'grid2';
+    T.PRIZE_ORDER.forEach(function (k) { pg.appendChild(sw(T.PRIZES[k].label, settings.prizesEnabled[k], function (v) { settings.prizesEnabled[k] = v; saveSettings(); })); });
+    b.appendChild(field('Prizes enabled', pg));
+    // auto-call + interval
+    var rng = document.createElement('input'); rng.type = 'range'; rng.min = 5; rng.max = 15; rng.step = 1; rng.value = settings.autoCallIntervalSeconds; rng.setAttribute('aria-label', 'Auto-call interval');
+    var rl = document.createElement('div'); rl.className = 'caption';
+    function rngUpdate() { rl.textContent = settings.autoCallIntervalSeconds + ' seconds between calls'; rng.disabled = !settings.autoCallEnabled; rng.style.opacity = settings.autoCallEnabled ? 1 : .45; }
+    rng.oninput = function () { settings.autoCallIntervalSeconds = +rng.value; saveSettings(); rngUpdate(); };
+    b.appendChild(field('Auto-call', sw('Call numbers automatically', settings.autoCallEnabled, function (v) { settings.autoCallEnabled = v; saveSettings(); rngUpdate(); })));
+    var iw = field('Auto-call interval', rng); iw.appendChild(rl); b.appendChild(iw); rngUpdate();
+    b.appendChild(field('Host TTS', sw('Speak each number on this device', settings.hostTtsEnabled, function (v) { settings.hostTtsEnabled = v; saveSettings(); })));
+    var jh = document.createElement('div');
+    seg(jh, ['auto', 'host_approves'], { auto: 'Anyone with PIN', host_approves: 'Host approves each join' }, function () { return settings.joinApprovalMode; }, function (o) { settings.joinApprovalMode = o; saveSettings(); });
+    b.appendChild(field('Join approval mode', jh));
+    var rh = document.createElement('div');
+    seg(rh, ['highest_points', 'full_house_winner'], { highest_points: 'Highest points', full_house_winner: 'Full House winner = 1st' }, function () { return settings.rankingBasis; }, function (o) { settings.rankingBasis = o; saveSettings(); });
+    b.appendChild(field('Ranking basis (money prizes)', rh));
+  }
+  $('#lnkHow').onclick = function () { explainerAfter = function () { go('settings'); }; openExplainer(); };
+  $('#lnkAbout').onclick = function () { Fx.modal('<h3>About</h3><p>This app never uses the internet — everything runs on your local network, with no analytics and no accounts.</p>'); };
+  $('#btnSetBack').onclick = function () { if (settingsMode === 'edit') go('lobby'); else go('landing'); };
+  $('#btnOpenLobby').onclick = function () {
+    saveSettings();
+    if (settingsMode === 'edit') { game.updateSettings(settings); go('lobby'); }
+    else createRoom();
+  };
+
+  // ---------- room ----------
+  function makeGame(saved) {
+    var g = new T.GameHost({ transport: transport, settings: settings, pin: saved ? saved.pin : String(1000 + T.randInt(9000)) });
+    if (saved) g.restore(saved);
+    var saveT = 0;
+    g.on('change', function () { scheduleRender(); clearTimeout(saveT); saveT = setTimeout(function () { lsSet(KEY.game, g.serialize()); }, 250); });
+    g.on('drawStart', onDrawStart);
+    g.on('called', onCalled);
+    g.on('claim', onClaim);
+    g.on('announce', function (a) { toast(a.playerName + ' — ' + ({ top: 'Top', middle: 'Middle', bottom: 'Bottom' })[a.row] + ' Line Completed'); Sfx.popup(); });
+    return g;
+  }
+  function createRoom() {
+    game = makeGame(null); lsSet(KEY.game, game.serialize()); startAux(); go('lobby');
+  }
+
+  // ---------- lobby ----------
+  var lastQr = '';
+  function chosenIp() {
+    var ips = net.addresses.map(function (a) { return a.ip; });
+    if (net.ipChoice && ips.indexOf(net.ipChoice) >= 0) return net.ipChoice;
+    if (ips.indexOf(location.hostname) >= 0) return location.hostname;
+    return ips[0] || null;
+  }
+  function joinUrl() {
+    var ip = chosenIp(); if (!ip) return null;
+    return 'http://' + ip + ':' + net.port + '/play?pin=' + game.pin + '&mode=' + game.settings.joinApprovalMode;
+  }
+  function renderLobby() {
+    $('#pin').textContent = game.pin;
+    var ip = chosenIp(), url = joinUrl();
+    $('#noNet').classList.toggle('hidden', !!ip);
+    $('#ipport').textContent = ip ? ip + ':' + net.port : '';
+    $('#joinUrl').textContent = url || '';
+    $('#netPick').classList.toggle('hidden', net.addresses.length < 2);
+    if (net.addresses.length > 1) {
+      var sel = $('#netSel'), cur = chosenIp();
+      if (sel.dataset.ips !== net.addresses.map(function (a) { return a.ip; }).join()) {
+        sel.dataset.ips = net.addresses.map(function (a) { return a.ip; }).join();
+        sel.innerHTML = net.addresses.map(function (a) { return '<option value="' + a.ip + '">' + esc(a.ip + ' (' + a.iface + ')') + '</option>'; }).join('');
+      }
+      sel.value = cur;
+    }
+    if (url && url !== lastQr) {
+      lastQr = url; var qr = qrcode(0, 'M'); qr.addData(url); qr.make();
+      $('#qr').innerHTML = qr.createSvgTag({ cellSize: 6, margin: 2, scalable: true }).replace(/fill="white"/g, 'fill="#FDF6E3"').replace(/fill="black"/g, 'fill="#111111"');
+    } else if (!url) { lastQr = ''; $('#qr').innerHTML = ''; }
+    var rows = game.players.map(function (p) {
+      return '<li><span class="dot ' + (p.connectionStatus === 'connected' ? 'connected' : 'disconnected') + '"></span><span class="nm">' + esc(p.name) + '</span><span class="st">Joined</span>' +
+        '<button class="btn ghost small" data-kick="' + p.playerId + '">Remove</button></li>';
+    }).concat(game.pending.map(function (p) {
+      return '<li><span class="dot" style="background:var(--gold)"></span><span class="nm">' + esc(p.name) + '</span><span class="st">Pending approval</span>' +
+        '<button class="btn small" data-acc="' + p.pendingId + '">Accept</button><button class="btn danger small" data-rej="' + p.pendingId + '">Reject</button></li>';
+    }));
+    $('#plist').innerHTML = rows.join('');
+    $('#pempty').classList.toggle('hidden', rows.length > 0);
+    $('#pcount').textContent = '(' + game.players.length + ' / ' + game.settings.maxPlayers + ')';
+    $('#btnStart').disabled = !game.canStart();
+  }
+  $('#plist').addEventListener('click', function (e) {
+    var t = e.target.closest('button'); if (!t) return;
+    if (t.dataset.acc) game.approve(t.dataset.acc);
+    else if (t.dataset.rej) game.reject(t.dataset.rej);
+    else if (t.dataset.kick) game.kickPlayer(t.dataset.kick);
+  });
+  $('#netSel').onchange = function () { net.ipChoice = this.value; lastQr = ''; renderLobby(); };
+  $('#btnStart').onclick = function () { unlockMedia(); if (game.startGame()) { buildBoard(); go('game'); } };
+  $('#btnLobbySettings').onclick = function () { openSettings(true); };
+  $('#btnClose').onclick = function () {
+    Fx.modal('<h3>Close this room?</h3><p>Everyone who has joined will be disconnected.</p>', [{ label: 'Keep open', value: false, cls: 'ghost' }, { label: 'Close room', value: true, cls: 'danger' }]).then(function (ok) {
+      if (!ok) return;
+      game.players.slice().forEach(function (p) { game.kickPlayer(p.playerId); });
+      game.pending.slice().forEach(function (p) { game.reject(p.pendingId); });
+      game = null; lsDel(KEY.game); $('#btnResume').dataset.label = ''; lastQr = ''; go('landing');
+    });
+  };
+  setInterval(function () { if (curScreen === 'lobby' && net.ok) fetchInfo().then(scheduleRender); }, 15000);
+
+  // ---------- in-game ----------
+  var boardBuilt = false, drawTimers = [];
+  function buildBoard() {
+    var b = $('#board'); b.innerHTML = '';
+    for (var n = 1; n <= 90; n++) { var c = document.createElement('div'); c.className = 'c'; c.textContent = n; c.dataset.n = n; c.setAttribute('role', 'gridcell'); b.appendChild(c); }
+    boardBuilt = true;
+  }
+  function updateBoard() {
+    if (!boardBuilt) buildBoard();
+    var set = {}; game.calledNumbersSoFar.forEach(function (n) { set[n] = 1; });
+    Array.prototype.forEach.call($('#board').children, function (c) { c.classList.toggle('called', !!set[c.dataset.n]); c.setAttribute('aria-label', c.dataset.n + (set[c.dataset.n] ? ' called' : '')); });
+  }
+  function clearDraw() { drawTimers.forEach(clearTimeout); drawTimers = []; }
+  function onDrawStart() {
+    clearDraw();
+    var ball = $('#curBall'), num = $('#curNum');
+    ball.classList.remove('pop-in'); ball.classList.remove('spinning'); void ball.offsetWidth; ball.classList.add('spinning');
+    var t = 0, gap = 40;
+    (function flick() { if (t >= T.DRAW_MS - 90) return; num.textContent = 1 + T.randInt(90); gap *= 1.17; t += gap; drawTimers.push(setTimeout(flick, gap)); })();
+    try { if ('speechSynthesis' in window) speechSynthesis.cancel(); } catch (e) {}
+    tts.token++;
+  }
+  function onCalled(e) {
+    clearDraw();
+    var ball = $('#curBall'); ball.classList.remove('spinning'); void ball.offsetWidth;
+    $('#curNum').textContent = e.number; ball.classList.add('pop-in');
+    Sfx.clack(); updateBoard();
+    if (game.settings.hostTtsEnabled) callOut(e.number);
+  }
+  var flashUntil = {};
+  function onClaim(c) {
+    if (!c.accepted) return;
+    flashUntil[c.playerId] = Date.now() + 1500;
+    toast(c.playerName + ' won ' + T.PRIZES[c.prizeType].label + ' (+' + c.pointsAwarded + ')', 'win');
+    if (c.prizeType === 'fullHouse') { Sfx.fanfare(); Fx.confetti(); } else Sfx.chime();
+  }
+  var toasts = null;
+  function toast(text, cls) { if (!toasts) toasts = new Fx.ToastQueue($('#hostToasts'), 3, 2500); toasts.push(text, cls); }
+
+  function callStatus() {
+    var g = game;
+    if (g.gameStatus === 'paused') return 'Paused';
+    if (g.drawing) return 'Drawing…';
+    if (g.ttsPending) return 'Calling out…';
+    if (!g.remainingNumbers.length) return 'All 90 numbers called';
+    if (g.settings.autoCallEnabled) return 'Next call in ' + Math.ceil(g.autoRemainingMs / 1000) + 's';
+    return '';
+  }
+  function updateCallPanel() {
+    var auto = game.settings.autoCallEnabled;
+    $('#btnCall').classList.toggle('hidden', auto);
+    $('#countdown').classList.toggle('hidden', !auto);
+    if (auto) $('#countdown').textContent = callStatus();
+    $('#btnCall').disabled = !game.canCall();
+    $('#callInfo').textContent = (auto ? '' : callStatus() + (callStatus() ? ' · ' : '')) + game.calledNumbersSoFar.length + ' of 90 called';
+  }
+  function renderGame() {
+    if (!boardBuilt) buildBoard();
+    updateBoard(); updateCallPanel();
+    if (game.currentNumber != null && !game.drawing && $('#curNum').textContent === '–') $('#curNum').textContent = game.currentNumber;
+    $('#btnPause').textContent = game.gameStatus === 'paused' ? 'Resume' : 'Pause';
+    $('#btnPause').disabled = game.drawing;
+    var bn = $('#banner'), msg = '';
+    if (!game.remainingNumbers.length && !game.drawing) msg = 'All 90 numbers have been called. End the game when you\'re ready.';
+    else if (game.accepted.fullHouse) msg = 'Full House has been won. You can end the game now.';
+    bn.classList.toggle('hidden', !msg); bn.textContent = msg;
+    // leaderboard (10 §1 / 08 §2: connected, disconnected (faded), quit (blacked out))
+    var now = Date.now(), rk = game.rankings(), prizeLbl = function (k) { return '<span class="chip">' + esc(T.PRIZES[k].label) + '</span>'; };
+    $('#lb tbody').innerHTML = rk.map(function (r, i) {
+      var cls = r.connectionStatus + ((flashUntil[r.playerId] || 0) > now ? ' flash' : '');
+      var dot = r.connectionStatus === 'quit' ? '' : '<span class="dot ' + r.connectionStatus + '" title="' + r.connectionStatus + '"></span> ';
+      return '<tr class="' + cls + '"><td>' + (i + 1) + '</td><td>' + dot + esc(r.playerName) + (r.connectionStatus === 'quit' ? ' <span class="small">(quit)</span>' : '') + '</td><td>' + r.prizesWon.map(prizeLbl).join('') + '</td><td class="pts">' + r.points + '</td></tr>';
+    }).join('');
+    if (!rk.length) $('#lb tbody').innerHTML = '<tr><td colspan="4" class="muted">No players</td></tr>';
+    // players + kick
+    $('#gplist').innerHTML = game.players.map(function (p) {
+      return '<li><span class="dot ' + (p.connectionStatus === 'quit' ? '' : p.connectionStatus) + '"></span><span class="nm">' + esc(p.name) + '</span><span class="st">' + p.connectionStatus + '</span><button class="btn danger small" data-kick="' + p.playerId + '">Kick</button></li>';
+    }).join('');
+    // claims history, newest first, with Override
+    var cl = game.claims.slice().reverse();
+    $('#claimsEmpty').classList.toggle('hidden', cl.length > 0);
+    $('#claims').innerHTML = cl.map(function (c) {
+      var res = c.accepted ? '<span class="acc">Accepted +' + c.pointsAwarded + '</span>' : '<span class="rej">Rejected</span> <span class="small muted">' + esc(c.rejectionReason || '') + '</span>';
+      return '<li><span>' + esc(c.playerName) + ' — ' + esc(T.PRIZES[c.prizeType].label) + '<br>' + res + (c.overridden ? ' <span class="small muted">(overridden)</span>' : '') + '</span>' +
+        '<button class="btn ghost small" data-ov="' + c.id + '"' + (game.canOverride(c) ? '' : ' disabled title="Override the current winner first"') + '>Override</button></li>';
+    }).join('');
+  }
+  $('#btnCall').onclick = function () { unlockMedia(); game.callNext(); };
+  $('#btnPause').onclick = function () { if (game.gameStatus === 'paused') game.resume(); else game.pause(); };
+  $('#btnEnd').onclick = function () {
+    Fx.modal('<h3>End the game now?</h3><p>Final standings and prize money will be worked out from the current points.</p>', [{ label: 'Keep playing', value: false, cls: 'ghost' }, { label: 'End game', value: true, cls: 'danger' }]).then(function (ok) {
+      if (ok) { game.endGame(); try { if (noSleep) noSleep.disable(); } catch (e) {} }
+    });
+  };
+  document.addEventListener('click', function (e) {
+    var t = e.target.closest('button'); if (!t || curScreen !== 'game') return;
+    if (t.dataset.kick) {
+      var p = game.playerById(t.dataset.kick); if (!p) return;
+      Fx.modal('<h3>Kick ' + esc(p.name) + '?</h3><p>They will be removed from the game and can\'t come back with their old session.</p>', [{ label: 'Cancel', value: false, cls: 'ghost' }, { label: 'Kick', value: true, cls: 'danger' }]).then(function (ok) { if (ok) game.kickPlayer(p.playerId); });
+    } else if (t.dataset.ov) game.overrideClaim(+t.dataset.ov);
+  });
+
+  // ---------- game over ----------
+  function renderOver() {
+    var fr = game.finalRankings || [], cur = game.settings.prizeMoney.currency || '';
+    $('#overBody').innerHTML = fr.map(function (r, i) {
+      return '<tr class="' + (i === 0 ? 'first' : '') + '"><td>' + (i + 1) + '</td><td>' + esc(r.playerName) + '</td><td class="num">' + r.points + '</td><td class="num">' + (r.moneyPrize ? esc(cur) + r.moneyPrize : '–') + '</td></tr>';
+    }).join('');
+    $('#overNote').textContent = game.settings.rankingBasis === 'full_house_winner' ? 'Prize money: the Full House winner is 1st; the rest go by points.' : 'Prize money goes to the top three by points.';
+  }
+  $('#btnNew').onclick = function () { if (game.newGame()) { boardBuilt = false; $('#curNum').textContent = '–'; go('lobby'); } };
+  function resultsText() {
+    var cur = game.settings.prizeMoney.currency || '';
+    return 'Tambola results\n' + (game.finalRankings || []).map(function (r, i) { return (i + 1) + '. ' + r.playerName + ' — ' + r.points + ' pts' + (r.moneyPrize ? ' — ' + cur + r.moneyPrize : ''); }).join('\n');
+  }
+  function resultsCanvas() {
+    var fr = game.finalRankings || [], cur = game.settings.prizeMoney.currency || '', W = 900, rowH = 58, H = 190 + Math.max(1, fr.length) * rowH + 30;
+    var cv = document.createElement('canvas'); cv.width = W; cv.height = H; var g = cv.getContext('2d');
+    if (!g) return null;
+    g.fillStyle = '#0B3D3C'; g.fillRect(0, 0, W, H);
+    g.fillStyle = '#E0A458'; g.font = '800 64px Georgia, serif'; g.fillText('Tambola', 40, 92);
+    g.fillStyle = '#FDF6E3'; g.font = '26px Arial, sans-serif'; g.fillText('Final standings', 42, 140);
+    fr.forEach(function (r, i) {
+      var y = 170 + i * rowH; g.fillStyle = i === 0 ? '#E0A458' : '#123C69'; g.fillRect(30, y, W - 60, rowH - 8);
+      g.fillStyle = i === 0 ? '#111111' : '#FDF6E3'; g.font = '700 28px Arial, sans-serif';
+      g.fillText((i + 1) + '.  ' + r.playerName.slice(0, 22), 50, y + 36);
+      g.textAlign = 'right'; g.fillText(r.points + ' pts' + (r.moneyPrize ? '   ' + cur + r.moneyPrize : ''), W - 50, y + 36); g.textAlign = 'left';
+    });
+    return cv;
+  }
+  $('#btnShare').onclick = function () {
+    var text = resultsText(), cv = resultsCanvas();
+    var fallback = function () {
+      Fx.modal('<h3>Share results</h3><p class="small muted">Copy the text, or save the image.</p><textarea id="shTxt" readonly rows="8" style="width:100%;background:var(--teal);color:var(--paper);border:2px solid var(--paper-20);border-radius:8px;padding:8px"></textarea>',
+        [{ label: 'Save image', value: 'img', cls: 'ghost' }, { label: 'Copy text', value: 'copy' }, { label: 'Close', value: 'x', cls: 'ghost' }]).then(function (v) {
+        if (v === 'img' && cv) { var a = document.createElement('a'); a.download = 'tambola-results.png'; a.href = cv.toDataURL('image/png'); document.body.appendChild(a); a.click(); a.remove(); }
+        if (v === 'copy') { var ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); } catch (e) {} ta.remove(); }
+      });
+      var t = $('#shTxt'); if (t) t.value = text;
+    };
+    if (cv && navigator.canShare && cv.toBlob) {
+      cv.toBlob(function (blob) {
+        try {
+          var f = new File([blob], 'tambola-results.png', { type: 'image/png' });
+          if (navigator.canShare({ files: [f] })) return navigator.share({ files: [f], text: text }).catch(function () {});
+        } catch (e) {}
+        fallback();
+      });
+    } else if (navigator.share) navigator.share({ text: text }).catch(function () {}); else fallback();
+  };
+
+  // ---------- fullscreen toggle (works on both laptop and phone browsers) ----------
+  (function () {
+    var btn = $('#btnFullscreen');
+    var canFs = !!(document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen);
+    if (!canFs) { btn.style.display = 'none'; return; }
+    function isFs() { return !!(document.fullscreenElement || document.webkitFullscreenElement); }
+    function updateFs() { btn.textContent = isFs() ? '⤢' : '⛶'; btn.setAttribute('aria-label', isFs() ? 'Exit fullscreen' : 'Enter fullscreen'); }
+    btn.onclick = function () {
+      if (!isFs()) {
+        var req = document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen;
+        var p = req.call(document.documentElement); if (p && p.catch) p.catch(function () {});
+      } else {
+        var exit = document.exitFullscreen || document.webkitExitFullscreen;
+        var p2 = exit.call(document); if (p2 && p2.catch) p2.catch(function () {});
+      }
+    };
+    document.addEventListener('fullscreenchange', updateFs);
+    document.addEventListener('webkitfullscreenchange', updateFs);
+    updateFs();
+  })();
+
+  // ---------- boot ----------
+  window.__host = { get game() { return game; }, get settings() { return settings; }, get net() { return net; }, get relay() { return relay; }, go: go };
+  drawSample();
+  fetchInfo().then(function () { renderLanding(); connectRelay(); renderRelay(); });
+  renderLanding();
+  // keep the screen awake again if the tab was reloaded mid-game
+  document.addEventListener('pointerdown', function () { if (game && game.gameStatus === 'in_progress') { try { if (noSleep && !noSleep.isEnabled) { var p = noSleep.enable(); if (p && p.catch) p.catch(function () {}); } } catch (e) {} } Sfx.unlock(); }, { passive: true });
+})();
+</script>
+</body>
+</html>
